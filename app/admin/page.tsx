@@ -75,6 +75,7 @@ export default function AdminDashboard() {
   const [newProduct, setNewProduct] = useState({ name: '', emoji: '🛒', description: '', price: 1, unit: 'item', stock: 10, maxPerOrder: 5 });
   const [showCleanupModal, setShowCleanupModal] = useState(false);
   const [cleanupPassword, setCleanupPassword] = useState("");
+  const [cleanupDays, setCleanupDays] = useState(30);
   const [cleanupCaptcha1, setCleanupCaptcha1] = useState(1);
   const [cleanupCaptcha2, setCleanupCaptcha2] = useState(1);
   const [cleanupCaptchaAnswer, setCleanupCaptchaAnswer] = useState("");
@@ -139,11 +140,14 @@ export default function AdminDashboard() {
   };
 
   const toggleActive = async (id: number, active: boolean) => {
+    // Optimistic update for instant UI feedback
+    setProducts(products.map(p => p.id === id ? { ...p, active } : p));
     await fetch(`/api/admin/products/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ active }),
     });
+    // Still load to ensure consistency in background
     load();
   };
 
@@ -172,6 +176,7 @@ export default function AdminDashboard() {
     setCleanupCaptcha1(Math.floor(Math.random() * 10) + 1);
     setCleanupCaptcha2(Math.floor(Math.random() * 10) + 1);
     setCleanupPassword("");
+    setCleanupDays(30);
     setCleanupCaptchaAnswer("");
     setCleanupError("");
     setShowCleanupModal(true);
@@ -191,7 +196,7 @@ export default function AdminDashboard() {
       const res = await fetch("/api/admin/orders/cleanup", { 
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password: cleanupPassword })
+        body: JSON.stringify({ password: cleanupPassword, days: cleanupDays })
       });
       const data = await res.json();
       
@@ -817,37 +822,37 @@ export default function AdminDashboard() {
               {showAddProduct && (
                 <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 mb-6 animate-slide-up">
                   <h3 className="font-serif text-lg text-white mb-4">Add New Product</h3>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                    <div className="col-span-2 md:col-span-1">
+                  <div className="space-y-4 mb-4">
+                    <div>
                       <label className="block text-xs text-gray-400 mb-1">Emoji</label>
-                      <input className="w-full bg-gray-800 border border-gray-700 rounded-lg p-2 text-white" value={newProduct.emoji} onChange={e => setNewProduct({...newProduct, emoji: e.target.value})} placeholder="🍎" />
+                      <input className="w-full bg-gray-800 border border-gray-700 rounded-lg p-3 text-white" value={newProduct.emoji} onChange={e => setNewProduct({...newProduct, emoji: e.target.value})} placeholder="🍎" />
                     </div>
-                    <div className="col-span-2 md:col-span-3">
-                      <label className="block text-xs text-gray-400 mb-1">Name</label>
-                      <input className="w-full bg-gray-800 border border-gray-700 rounded-lg p-2 text-white" value={newProduct.name} onChange={e => setNewProduct({...newProduct, name: e.target.value})} placeholder="Fresh Apples" />
+                    <div>
+                      <label className="block text-xs text-gray-400 mb-1">Name *</label>
+                      <input className="w-full bg-gray-800 border border-gray-700 rounded-lg p-3 text-white" value={newProduct.name} onChange={e => setNewProduct({...newProduct, name: e.target.value})} placeholder="Fresh Apples" />
                     </div>
-                    <div className="col-span-2 md:col-span-4">
+                    <div>
                       <label className="block text-xs text-gray-400 mb-1">Description</label>
-                      <input className="w-full bg-gray-800 border border-gray-700 rounded-lg p-2 text-white" value={newProduct.description} onChange={e => setNewProduct({...newProduct, description: e.target.value})} placeholder="Crisp and sweet" />
+                      <input className="w-full bg-gray-800 border border-gray-700 rounded-lg p-3 text-white" value={newProduct.description} onChange={e => setNewProduct({...newProduct, description: e.target.value})} placeholder="Crisp and sweet" />
                     </div>
                     <div>
-                      <label className="block text-xs text-gray-400 mb-1">Price (£)</label>
-                      <input type="number" step="0.1" className="w-full bg-gray-800 border border-gray-700 rounded-lg p-2 text-white" value={newProduct.price} onChange={e => setNewProduct({...newProduct, price: parseFloat(e.target.value)})} />
+                      <label className="block text-xs text-gray-400 mb-1">Price (£) *</label>
+                      <input type="number" step="0.1" className="w-full bg-gray-800 border border-gray-700 rounded-lg p-3 text-white" value={newProduct.price} onChange={e => setNewProduct({...newProduct, price: parseFloat(e.target.value)})} />
                     </div>
                     <div>
-                      <label className="block text-xs text-gray-400 mb-1">Unit</label>
-                      <input className="w-full bg-gray-800 border border-gray-700 rounded-lg p-2 text-white" value={newProduct.unit} onChange={e => setNewProduct({...newProduct, unit: e.target.value})} placeholder="bag" />
+                      <label className="block text-xs text-gray-400 mb-1">Unit *</label>
+                      <input className="w-full bg-gray-800 border border-gray-700 rounded-lg p-3 text-white" value={newProduct.unit} onChange={e => setNewProduct({...newProduct, unit: e.target.value})} placeholder="bag" />
                     </div>
                     <div>
                       <label className="block text-xs text-gray-400 mb-1">Initial Stock</label>
-                      <input type="number" className="w-full bg-gray-800 border border-gray-700 rounded-lg p-2 text-white" value={newProduct.stock} onChange={e => setNewProduct({...newProduct, stock: parseInt(e.target.value)})} />
+                      <input type="number" className="w-full bg-gray-800 border border-gray-700 rounded-lg p-3 text-white" value={newProduct.stock} onChange={e => setNewProduct({...newProduct, stock: parseInt(e.target.value)})} />
                     </div>
                     <div>
                       <label className="block text-xs text-gray-400 mb-1">Max/Order</label>
-                      <input type="number" className="w-full bg-gray-800 border border-gray-700 rounded-lg p-2 text-white" value={newProduct.maxPerOrder} onChange={e => setNewProduct({...newProduct, maxPerOrder: parseInt(e.target.value)})} />
+                      <input type="number" className="w-full bg-gray-800 border border-gray-700 rounded-lg p-3 text-white" value={newProduct.maxPerOrder} onChange={e => setNewProduct({...newProduct, maxPerOrder: parseInt(e.target.value)})} />
                     </div>
                   </div>
-                  <button onClick={addProduct} disabled={!newProduct.name || !newProduct.emoji} className="px-4 py-2 bg-green-700 hover:bg-green-600 disabled:opacity-50 text-white text-sm font-medium rounded-xl transition w-full">
+                  <button onClick={addProduct} disabled={!newProduct.name || !newProduct.emoji} className="px-4 py-3 bg-green-700 hover:bg-green-600 disabled:opacity-50 text-white text-sm font-medium rounded-xl transition w-full">
                     Save Product to Google Sheets
                   </button>
                 </div>
@@ -1006,6 +1011,10 @@ export default function AdminDashboard() {
                 <label className="block text-xs font-medium text-gray-400 mb-1">Name</label>
                 <input type="text" className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-grove-500" value={newProduct.name} onChange={e => setNewProduct({...newProduct, name: e.target.value})} />
               </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-400 mb-1">Description</label>
+                <input type="text" className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-grove-500" value={newProduct.description} onChange={e => setNewProduct({...newProduct, description: e.target.value})} />
+              </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-medium text-gray-400 mb-1">Emoji</label>
@@ -1014,6 +1023,20 @@ export default function AdminDashboard() {
                 <div>
                   <label className="block text-xs font-medium text-gray-400 mb-1">Price (£)</label>
                   <input type="number" step="0.01" className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-grove-500" value={newProduct.price} onChange={e => setNewProduct({...newProduct, price: parseFloat(e.target.value)})} />
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-gray-400 mb-1">Unit</label>
+                  <input type="text" placeholder="e.g. kg, item" className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-grove-500" value={newProduct.unit} onChange={e => setNewProduct({...newProduct, unit: e.target.value})} />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-400 mb-1">Stock</label>
+                  <input type="number" className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-grove-500" value={newProduct.stock} onChange={e => setNewProduct({...newProduct, stock: parseInt(e.target.value)})} />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-400 mb-1">Max/Order</label>
+                  <input type="number" className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-grove-500" value={newProduct.maxPerOrder} onChange={e => setNewProduct({...newProduct, maxPerOrder: parseInt(e.target.value)})} />
                 </div>
               </div>
               <div className="flex gap-3 mt-6">
@@ -1031,10 +1054,21 @@ export default function AdminDashboard() {
           <div className="bg-gray-900 border border-gray-800 p-6 rounded-2xl max-w-sm w-full shadow-2xl animate-pop relative">
             <h3 className="font-serif text-xl text-red-400 mb-2">Clear Old Orders</h3>
             <p className="text-gray-400 text-sm mb-4">
-              This will permanently delete all orders older than 30 days. 
-              The deleted data will be automatically downloaded as a backup CSV.
+              Delete orders older than a certain number of days. 
+              The deleted data will be automatically downloaded as a backup CSV before deletion.
             </p>
             <form onSubmit={confirmCleanup} className="space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-gray-400 mb-1">Delete orders older than (days)</label>
+                <input 
+                  type="number" 
+                  min="1"
+                  required
+                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-red-500" 
+                  value={cleanupDays} 
+                  onChange={e => setCleanupDays(parseInt(e.target.value) || 30)} 
+                />
+              </div>
               <div>
                 <label className="block text-xs font-medium text-gray-400 mb-1">Admin Password</label>
                 <input 

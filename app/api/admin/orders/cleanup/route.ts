@@ -6,7 +6,7 @@ export async function POST(req: NextRequest) {
   if (!verifyAdminRequest(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   try {
-    const { password } = await req.json();
+    const { password, days } = await req.json();
     if (!password) {
       return NextResponse.json({ error: 'Password required' }, { status: 400 });
     }
@@ -16,14 +16,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid password' }, { status: 403 });
     }
 
+    const daysToKeep = days && days > 0 ? days : 30;
     const ip = req.headers.get('x-forwarded-for') || 'unknown';
-    const { deletedCount, deletedData } = await cleanupOldOrders(ip);
+    const { deletedCount, deletedData } = await cleanupOldOrders(ip, daysToKeep);
     
     let csvData = "";
     if (deletedData && deletedData.length > 0) {
       const headers = Object.keys(deletedData[0]).join(',');
-      const rows = deletedData.map(row => 
-        Object.values(row).map(val => `"${String(val).replace(/"/g, '""')}"`).join(',')
+      const rows = deletedData.map((row: any) => 
+        Object.values(row).map((val: any) => `"${String(val).replace(/"/g, '""')}"`).join(',')
       ).join('\n');
       csvData = `${headers}\n${rows}`;
     }

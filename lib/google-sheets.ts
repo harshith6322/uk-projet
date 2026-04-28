@@ -306,14 +306,14 @@ export async function getFeedbackStats() {
   }
 }
 
-export async function cleanupOldOrders(ip?: string) {
+export async function cleanupOldOrders(ip?: string, days: number = 30) {
   try {
     const doc = await getDoc();
     const sheet = doc.sheetsByTitle['Orders'];
     if (!sheet) return { deletedCount: 0, deletedData: [] };
 
     const rows = await sheet.getRows();
-    const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
+    const cutoffDate = Date.now() - days * 24 * 60 * 60 * 1000;
     let deletedCount = 0;
     const deletedData: any[] = [];
 
@@ -323,7 +323,7 @@ export async function cleanupOldOrders(ip?: string) {
       const dateStr = r.get('Date');
       if (dateStr) {
         const orderDate = new Date(dateStr).getTime();
-        if (orderDate < thirtyDaysAgo) {
+        if (orderDate < cutoffDate) {
           deletedData.push({
             id: r.get('ID'),
             orderNumber: r.get('Order Number'),

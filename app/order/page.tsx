@@ -174,7 +174,7 @@ export default function OrderPage() {
 
   if (haltStore) {
     return (
-      <div className="min-h-screen pattern-bg flex items-center justify-center p-4">
+           <div className="min-h-screen pattern-bg flex items-center justify-center p-4">
         <div className="card max-w-md w-full p-8 text-center animate-slide-up shadow-2xl">
           <div className="text-6xl mb-6 grayscale opacity-80 animate-bounce-slow">🏪</div>
           <h1 className="font-serif text-3xl text-grove-800 mb-4">Store Closed</h1>

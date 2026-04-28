@@ -17,7 +17,15 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       if (body.stock !== undefined) row.set('Stock', body.stock);
       if (body.active !== undefined) row.set('Active', body.active ? 'TRUE' : 'FALSE');
       await row.save();
-      return NextResponse.json({ success: true });
+      return NextResponse.json(
+        { success: true },
+        { 
+          status: 200,
+          headers: {
+            'Cache-Control': 'no-cache, no-store, must-revalidate'
+          }
+        }
+      );
     }
     return NextResponse.json({ error: 'Product not found' }, { status: 404 });
   } catch (err: any) {
