@@ -16,7 +16,10 @@ export async function GET(req: NextRequest) {
     enableCaptcha: settings['EnableCaptcha'] === 'TRUE',
     allowCustomerCancellation: settings['AllowCustomerCancellation'] === 'TRUE',
     enableFeedback: settings['EnableFeedback'] !== 'FALSE', // default to true
-    haltMessage: settings['HaltMessage'] || 'We are out of stock for the week. See you next week!'
+    haltMessage: settings['HaltMessage'] || 'We are out of stock for the week. See you next week!',
+    enableTracking: settings['EnableTracking'] !== 'FALSE',
+    enableNotice: settings['EnableNotice'] === 'TRUE',
+    noticeMessage: settings['NoticeMessage'] || 'Please place orders by 7:00 AM Friday Collection: Friday 6–8 PM'
   });
   response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
   return response;
@@ -45,6 +48,15 @@ export async function POST(req: NextRequest) {
   }
   if (typeof body.haltMessage === 'string') {
     await setSetting('HaltMessage', body.haltMessage);
+  }
+  if (typeof body.enableTracking === 'boolean') {
+    await setSetting('EnableTracking', body.enableTracking ? 'TRUE' : 'FALSE');
+  }
+  if (typeof body.enableNotice === 'boolean') {
+    await setSetting('EnableNotice', body.enableNotice ? 'TRUE' : 'FALSE');
+  }
+  if (typeof body.noticeMessage === 'string') {
+    await setSetting('NoticeMessage', body.noticeMessage);
   }
   return NextResponse.json({ success: true });
 }

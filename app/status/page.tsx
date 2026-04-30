@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 export default function OrderStatus() {
   const [orderId, setOrderId] = useState("");
@@ -18,11 +19,16 @@ export default function OrderStatus() {
   const [cancelError, setCancelError] = useState("");
   const [cancelSuccess, setCancelSuccess] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  const router = useRouter();
 
   useEffect(() => {
     fetch('/api/config')
       .then(res => res.json())
       .then(data => {
+        if (data.enableTracking === false) {
+          router.push('/order');
+          return;
+        }
         if (data.enableCaptcha) {
           setEnableCaptcha(true);
           setCaptchaNum1(Math.floor(Math.random() * 10) + 1);

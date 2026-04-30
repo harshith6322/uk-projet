@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 
 type Order = {
@@ -66,8 +66,49 @@ export default function AdminDashboard() {
   const [enableCaptcha, setEnableCaptcha] = useState(false);
   const [allowCustomerCancellation, setAllowCustomerCancellation] = useState(false);
   const [enableFeedback, setEnableFeedback] = useState(true);
+  const [enableTracking, setEnableTracking] = useState(true);
+  const [enableNotice, setEnableNotice] = useState(false);
+  const [noticeMessage, setNoticeMessage] = useState("");
   const [haltMessage, setHaltMessage] = useState("");
   const [loading, setLoading] = useState(true);
+
+  const getMonday = (d: Date) => {
+    const nd = new Date(d);
+    const day = nd.getDay();
+    const diff = nd.getDate() - day + (day === 0 ? -6 : 1);
+    return new Date(nd.setDate(diff)).toISOString().split('T')[0];
+  };
+  const getFriday = (d: Date) => {
+    const nd = new Date(d);
+    const day = nd.getDay();
+    const diff = nd.getDate() - day + (day === 0 ? -6 : 1) + 4;
+    return new Date(nd.setDate(diff)).toISOString().split('T')[0];
+  };
+
+  const [prepStartDate, setPrepStartDate] = useState(() => getMonday(new Date()));
+  const [prepEndDate, setPrepEndDate] = useState(() => getFriday(new Date()));
+
+  const prepSummary = useMemo(() => {
+    const start = new Date(prepStartDate); start.setHours(0,0,0,0);
+    const end = new Date(prepEndDate); end.setHours(23,59,59,999);
+    
+    const activeOrders = orders.filter(o => o.status === 'pending' && new Date(o.createdAt) >= start && new Date(o.createdAt) <= end);
+    const totals: Record<number, { name: string, emoji: string, unit: string, qty: number }> = {};
+    
+    products.forEach(p => { if (p.active) totals[p.id] = { name: p.name, emoji: p.emoji, unit: p.unit, qty: 0 } });
+    
+    activeOrders.forEach(o => {
+      o.items.forEach(item => {
+        const p = products.find(prod => prod.name === item.product.name);
+        if (p && totals[p.id]) {
+          totals[p.id].qty += item.quantity;
+        }
+      });
+    });
+    
+    return { activeOrders, totals: Object.values(totals).filter(t => t.qty > 0).sort((a,b) => b.qty - a.qty) };
+  }, [orders, products, prepStartDate, prepEndDate]);
+
   const [filter, setFilter] = useState("all");
   const [sortOrder, setSortOrder] = useState<"newest" | "oldest">("newest");
   const [expandedOrder, setExpandedOrder] = useState<number | null>(null);
@@ -114,6 +155,9 @@ export default function AdminDashboard() {
     if (settings.allowCustomerCancellation !== undefined) setAllowCustomerCancellation(settings.allowCustomerCancellation);
     if (settings.enableFeedback !== undefined) setEnableFeedback(settings.enableFeedback);
     if (settings.haltMessage !== undefined) setHaltMessage(settings.haltMessage);
+    if (settings.enableTracking !== undefined) setEnableTracking(settings.enableTracking);
+    if (settings.enableNotice !== undefined) setEnableNotice(settings.enableNotice);
+    if (settings.noticeMessage !== undefined) setNoticeMessage(settings.noticeMessage);
     setLoading(false);
   }, [router]);
 
@@ -225,6 +269,58 @@ export default function AdminDashboard() {
     }
   };
 
+  const downloadPrepSheet = () => {
+    const activeProducts = products.filter(p => p.active);
+    const activeOrders = prepSummary.activeOrders;
+
+    if (activeOrders.length === 0) {
+      alert("No pending orders to generate a prep sheet for.");
+      return;
+    }
+
+    let csv = "Name," + activeProducts.map(p => p.name.replace(/,/g, '')).join(",") + ",Total Amount\n";
+
+    const productTotals: Record<number, number> = {};
+    activeProducts.forEach(p => productTotals[p.id] = 0);
+    let grandTotalAmount = 0;
+
+    activeOrders.forEach(o => {
+      let row = `"${o.name.replace(/"/g, '""')}",`;
+      activeProducts.forEach(p => {
+        const item = o.items.find(i => i.product.name === p.name);
+        const qty = item ? item.quantity : 0;
+        productTotals[p.id] += qty;
+        row += `${qty},`;
+      });
+      grandTotalAmount += o.totalAmount;
+      row += `£${o.totalAmount.toFixed(2)}\n`;
+      csv += row;
+    });
+
+    let totalRow = "TOTAL,";
+    activeProducts.forEach(p => {
+      totalRow += `${productTotals[p.id]},`;
+    });
+    totalRow += `£${grandTotalAmount.toFixed(2)}\n\n\n`;
+    csv += totalRow;
+
+    activeProducts.forEach(p => {
+      if (productTotals[p.id] > 0) {
+        csv += `"${p.name.replace(/"/g, '""')}","${productTotals[p.id]} ${p.unit}s"\n`;
+      }
+    });
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.setAttribute('hidden', '');
+    a.setAttribute('href', url);
+    a.setAttribute('download', `prep_sheet_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
+
   const logout = async () => {
     await fetch("/api/auth/logout", { method: "POST" });
     router.push("/admin/login");
@@ -254,7 +350,7 @@ export default function AdminDashboard() {
     <div className="min-h-screen bg-gray-950 text-gray-100">
       {/* Sidebar */}
       <div className="flex">
-        <aside className="w-56 min-h-screen bg-gray-900 border-r border-gray-800 flex flex-col fixed top-0 left-0 z-30">
+        <aside className="hidden w-56 min-h-screen bg-gray-900 border-r border-gray-800 sm:flex flex-col fixed top-0 left-0 z-30">
           <div className="p-5 border-b border-gray-800">
             <div className="flex items-center gap-2">
               <span className="text-2xl">🌿</span>
@@ -309,8 +405,36 @@ export default function AdminDashboard() {
           </div>
         </aside>
 
+        {/* Mobile Nav */}
+        <nav className="sm:hidden fixed bottom-0 left-0 right-0 bg-gray-900 border-t border-gray-800 z-40 flex justify-around p-2 pb-safe shadow-[0_-10px_40px_rgba(0,0,0,0.5)]">
+          {(
+            [
+              ["dashboard", "📊"],
+              ["orders", "📋"],
+              ["stock", "📦"],
+              ["audit", "🛡️"],
+            ] as const
+          ).map(([t, icon]) => (
+            <button
+              key={t}
+              onClick={() => setTab(t)}
+              className={`p-3 rounded-xl transition relative ${tab === t ? "bg-grove-700 text-white" : "text-gray-400"}`}
+            >
+              <span className="text-xl">{icon}</span>
+              {t === "orders" && (stats?.pendingOrders ?? 0) > 0 && (
+                <span className="absolute top-1 right-1 bg-amber-500 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center">
+                  {stats?.pendingOrders}
+                </span>
+              )}
+            </button>
+          ))}
+          <button onClick={logout} className="p-3 text-red-400 hover:bg-red-900/30 rounded-xl transition">
+            <span className="text-xl">🔒</span>
+          </button>
+        </nav>
+
         {/* Main */}
-        <main className="ml-56 flex-1 p-6 min-h-screen">
+        <main className="ml-0 sm:ml-56 flex-1 p-4 sm:p-6 min-h-screen pb-24 sm:pb-6 overflow-x-hidden">
           {/* Dashboard Tab */}
           {tab === "dashboard" && stats && (
             <div className="animate-fade-in">
@@ -462,6 +586,57 @@ export default function AdminDashboard() {
                       {enableFeedback ? 'Customers receive a feedback link in their delivery email to rate products.' : 'No feedback links are sent to customers.'}
                     </p>
                   </div>
+
+                  <div className="pt-4 border-t border-gray-800 mt-4">
+                    <button
+                      onClick={async () => {
+                        const next = !enableTracking;
+                        setEnableTracking(next);
+                        await fetch("/api/admin/settings", { method: "POST", body: JSON.stringify({ enableTracking: next }) });
+                      }}
+                      className={`px-4 py-3 w-full sm:w-auto font-medium rounded-xl transition shadow-lg ${enableTracking ? 'bg-cyan-900 hover:bg-cyan-800 text-cyan-100 border border-cyan-700' : 'bg-gray-800 hover:bg-gray-700 text-gray-400 border border-gray-700'}`}
+                    >
+                      {enableTracking ? '📍 Public Order Tracking Enabled' : '🔒 Public Order Tracking Disabled'}
+                    </button>
+                    <p className="text-gray-500 text-xs mt-2">
+                      {enableTracking ? 'Customers can track their orders using their order number and phone number.' : 'The public tracking page link is hidden from the shop.'}
+                    </p>
+                  </div>
+
+                  <div className="pt-4 border-t border-gray-800 mt-4">
+                    <button
+                      onClick={async () => {
+                        const next = !enableNotice;
+                        setEnableNotice(next);
+                        await fetch("/api/admin/settings", { method: "POST", body: JSON.stringify({ enableNotice: next }) });
+                      }}
+                      className={`px-4 py-3 w-full sm:w-auto font-medium rounded-xl transition shadow-lg ${enableNotice ? 'bg-amber-900 hover:bg-amber-800 text-amber-100 border border-amber-700' : 'bg-gray-800 hover:bg-gray-700 text-gray-400 border border-gray-700'}`}
+                    >
+                      {enableNotice ? '📢 Notice Banner Active' : '🔇 Notice Banner Disabled'}
+                    </button>
+                    <p className="text-gray-500 text-xs mt-2">
+                      {enableNotice ? 'Customers will see a blinking banner with the custom message below.' : 'No special notice banner is shown.'}
+                    </p>
+                  </div>
+                  {enableNotice && (
+                    <div className="flex gap-2 animate-slide-up mt-3">
+                      <input 
+                        className="flex-1 bg-gray-800 border border-gray-700 rounded-lg p-3 text-white focus:outline-none focus:border-grove-500" 
+                        value={noticeMessage}
+                        onChange={(e) => setNoticeMessage(e.target.value)}
+                        placeholder="e.g. Please place orders by 7:00 AM Friday..."
+                      />
+                      <button
+                        onClick={async () => {
+                          await fetch("/api/admin/settings", { method: "POST", body: JSON.stringify({ noticeMessage }) });
+                          alert('Notice message updated successfully!');
+                        }}
+                        className="bg-amber-700 hover:bg-amber-600 text-white px-6 py-3 rounded-lg font-medium transition shadow-md"
+                      >
+                        Save Notice
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -574,16 +749,23 @@ export default function AdminDashboard() {
                 )}
               </div>
 
-              {/* Today's picking list */}
+              {/* Prep Sheet Summary */}
               <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 mb-6">
-                <h3 className="font-serif text-lg text-white mb-4">
-                  Today's Picking List
-                </h3>
-                {stats.itemTotals.length === 0 ? (
-                  <p className="text-gray-500 text-sm">No orders today yet.</p>
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 gap-4">
+                  <h3 className="font-serif text-lg text-white">
+                    Prep Sheet Summary
+                  </h3>
+                  <div className="flex items-center gap-2 text-sm bg-gray-800 p-2 rounded-lg border border-gray-700">
+                    <input type="date" value={prepStartDate} onChange={(e) => setPrepStartDate(e.target.value)} className="bg-transparent text-white outline-none text-xs" />
+                    <span className="text-gray-500 text-xs">to</span>
+                    <input type="date" value={prepEndDate} onChange={(e) => setPrepEndDate(e.target.value)} className="bg-transparent text-white outline-none text-xs" />
+                  </div>
+                </div>
+                {prepSummary.totals.length === 0 ? (
+                  <p className="text-gray-500 text-sm">No pending orders found for the selected date range.</p>
                 ) : (
                   <div className="space-y-3">
-                    {stats.itemTotals.map((item) => (
+                    {prepSummary.totals.map((item) => (
                       <div
                         key={item.name}
                         className="flex items-center gap-4 p-3 bg-gray-800 rounded-xl"
@@ -597,7 +779,7 @@ export default function AdminDashboard() {
                         </div>
                         <div className="text-right">
                           <p className="text-grove-400 text-2xl font-bold">
-                            {item.total}
+                            {item.qty}
                           </p>
                         </div>
                       </div>
@@ -641,9 +823,14 @@ export default function AdminDashboard() {
           {/* Orders Tab */}
           {tab === "orders" && (
             <div className="animate-fade-in">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="font-serif text-2xl text-white">Orders</h2>
-                <div className="flex gap-2">
+              <div className="flex flex-col xl:flex-row items-start xl:items-center justify-between mb-6 gap-4">
+                <div className="flex items-center gap-3">
+                  <h2 className="font-serif text-2xl text-white">Orders</h2>
+                  <button onClick={() => load()} className="p-2 bg-gray-800 hover:bg-gray-700 rounded-lg transition text-gray-400 hover:text-white" title="Refresh Orders">
+                    🔄
+                  </button>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
                   {["all", "pending", "collected", "cancelled"].map((f) => (
                     <button
                       key={f}
@@ -667,6 +854,23 @@ export default function AdminDashboard() {
                   
                   <div className="h-6 w-px bg-gray-800 mx-1 hidden sm:block"></div>
                   
+                  <div className="flex items-center gap-2 mr-0 xl:mr-2 bg-gray-800 p-1.5 rounded-lg border border-gray-700 w-full sm:w-auto mt-2 sm:mt-0 xl:hidden">
+                    <input type="date" value={prepStartDate} onChange={(e) => setPrepStartDate(e.target.value)} className="bg-transparent text-gray-300 text-xs outline-none flex-1 text-center" />
+                    <span className="text-gray-500 text-xs">to</span>
+                    <input type="date" value={prepEndDate} onChange={(e) => setPrepEndDate(e.target.value)} className="bg-transparent text-gray-300 text-xs outline-none flex-1 text-center" />
+                  </div>
+                  <div className="hidden xl:flex items-center gap-2 mr-2 bg-gray-800 p-1.5 rounded-lg border border-gray-700">
+                    <input type="date" value={prepStartDate} onChange={(e) => setPrepStartDate(e.target.value)} className="bg-transparent text-gray-300 text-xs outline-none" />
+                    <span className="text-gray-500 text-xs">to</span>
+                    <input type="date" value={prepEndDate} onChange={(e) => setPrepEndDate(e.target.value)} className="bg-transparent text-gray-300 text-xs outline-none" />
+                  </div>
+
+                  <button
+                    onClick={downloadPrepSheet}
+                    className="px-3 py-1.5 rounded-lg text-xs font-medium bg-grove-700 text-white hover:bg-grove-600 transition hidden sm:flex items-center gap-1 shadow-sm"
+                  >
+                    <span>📥</span> Prep Sheet
+                  </button>
                   <button
                     onClick={triggerCleanup}
                     className="px-3 py-1.5 rounded-lg text-xs font-medium bg-red-900/30 text-red-400 hover:bg-red-900/50 hover:text-red-300 transition hidden sm:block border border-red-900/50"
@@ -676,8 +880,13 @@ export default function AdminDashboard() {
                 </div>
               </div>
 
-              {/* Mobile Clear Button */}
-              <div className="sm:hidden mb-4">
+              <div className="sm:hidden mb-4 space-y-2 mt-4 border-t border-gray-800 pt-4">
+                <button
+                  onClick={downloadPrepSheet}
+                  className="w-full px-3 py-3 rounded-lg text-sm font-medium bg-grove-700 text-white hover:bg-grove-600 transition shadow-sm flex items-center justify-center gap-2"
+                >
+                  <span className="text-lg">📥</span> Download Prep Sheet (CSV)
+                </button>
                 <button
                   onClick={triggerCleanup}
                   className="w-full px-3 py-2 rounded-lg text-xs font-medium bg-red-900/30 text-red-400 hover:bg-red-900/50 hover:text-red-300 transition border border-red-900/50"

@@ -27,6 +27,9 @@ export default function OrderPage() {
   const [showUrgency, setShowUrgency] = useState(true);
   const [haltStore, setHaltStore] = useState(false);
   const [haltMessage, setHaltMessage] = useState("");
+  const [enableTracking, setEnableTracking] = useState(true);
+  const [enableNotice, setEnableNotice] = useState(false);
+  const [noticeMessage, setNoticeMessage] = useState("");
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -35,14 +38,17 @@ export default function OrderPage() {
 
   useEffect(() => {
     Promise.all([
-      fetch(`/api/products?t=${Date.now()}`, { cache: 'no-store' }).then((r) => r.json()),
-      fetch(`/api/config?t=${Date.now()}`, { cache: 'no-store' }).then((r) => r.json())
+      fetch('/api/products').then((r) => r.json()),
+      fetch('/api/config').then((r) => r.json())
     ]).then(([d, config]) => {
       setProducts(Array.isArray(d) ? d : []);
       if (config) {
         if (config.showUrgency !== undefined) setShowUrgency(config.showUrgency);
         if (config.haltStore !== undefined) setHaltStore(config.haltStore);
         if (config.haltMessage !== undefined) setHaltMessage(config.haltMessage);
+        if (config.enableTracking !== undefined) setEnableTracking(config.enableTracking);
+        if (config.enableNotice !== undefined) setEnableNotice(config.enableNotice);
+        if (config.noticeMessage !== undefined) setNoticeMessage(config.noticeMessage);
       }
       setLoading(false);
     }).catch(() => setLoading(false));
@@ -147,8 +153,8 @@ export default function OrderPage() {
       const data = await res.json();
       if (res.ok) {
         setCart({});
-        localStorage.removeItem("fresh_picks_cart");
-        localStorage.removeItem("fresh_picks_form");
+        setStep("shop");
+        setNotes("");
         router.push(`/order-confirmation?order=${data.orderNumber}`);
       } else {
         setError(data.error || "Something went wrong. Please try again.");
@@ -229,13 +235,15 @@ export default function OrderPage() {
               <span>{isDarkMode ? "☀️" : "🌙"}</span>
             </button>
 
-            <Link 
-              href="/status" 
-              className="flex items-center gap-1.5 bg-grove-500/40 hover:bg-grove-400/60 border border-grove-400/30 text-white text-xs font-medium px-3 py-2 rounded-full transition shadow-sm animate-pulse"
-            >
-              <span className="animate-bounce">📍</span>
-              <span className="hidden sm:inline">Track Order</span>
-            </Link>
+            {enableTracking && (
+              <Link 
+                href="/status" 
+                className="flex items-center gap-1.5 bg-grove-500/40 hover:bg-grove-400/60 border border-grove-400/30 text-white text-xs font-medium px-3 py-2 rounded-full transition shadow-sm animate-pulse"
+              >
+                <span className="animate-bounce">📍</span>
+                <span className="hidden sm:inline">Track Order</span>
+              </Link>
+            )}
             
             {itemCount > 0 && (
               <button
@@ -254,6 +262,12 @@ export default function OrderPage() {
       </header>
 
       <main className="max-w-5xl mx-auto px-4 py-8">
+        {enableNotice && noticeMessage && (
+          <div className="bg-amber-100 dark:bg-amber-900 border border-amber-300 dark:border-amber-700 text-amber-900 dark:text-amber-100 rounded-xl p-4 mb-6 text-center shadow-sm animate-pulse">
+            <p className="font-medium whitespace-pre-wrap">{noticeMessage}</p>
+          </div>
+        )}
+
         {step === "shop" && (
           <div className="animate-slide-up">
             <div className="text-center mb-10 mt-6 px-4">

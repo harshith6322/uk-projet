@@ -1,11 +1,23 @@
 'use client'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { Suspense } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 
 function Confirmation() {
   const params = useSearchParams()
   const order = params.get('order')
+  const [enableTracking, setEnableTracking] = useState(true);
+
+  useEffect(() => {
+    fetch('/api/config')
+      .then(res => res.json())
+      .then(data => {
+        if (data.enableTracking !== undefined) {
+          setEnableTracking(data.enableTracking);
+        }
+      })
+      .catch(() => {});
+  }, []);
   return (
     <div className="min-h-screen pattern-bg flex items-center justify-center px-4">
       <div className="card max-w-md w-full p-8 text-center animate-slide-up">
@@ -18,9 +30,11 @@ function Confirmation() {
             <p className="font-mono font-bold text-grove-600 text-xl">{order}</p>
           </div>
         )}
-        <p className="text-sm text-bark-400 mb-6">Collection details will be shared in the WhatsApp group. Check your email for confirmation.</p>
+        <p className="text-sm text-bark-400 mb-6">Please take a screenshot of your Order Number. This will make it easier to pick up your order for faster access.</p>
         <div className="space-y-3">
-          <Link href="/status" className="btn-primary block text-center">Track Order Status</Link>
+          {enableTracking && (
+            <Link href="/status" className="btn-primary block text-center">Track Order Status</Link>
+          )}
           <Link href="/order" className="block text-center text-grove-600 hover:underline">Order More</Link>
         </div>
       </div>
