@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getAllSettings } from '@/lib/google-sheets'
 
-export const revalidate = 30;
+export const revalidate = 15;
 
 export async function GET() {
   const settings = await getAllSettings();

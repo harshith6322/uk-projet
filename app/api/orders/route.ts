@@ -47,7 +47,8 @@ export async function POST(req: NextRequest) {
       'Phone': phone,
       'Items': JSON.stringify(orderItems),
       'Total': totalAmount,
-      'Status': 'pending'
+      'Status': 'pending',
+      'Paid': 'FALSE'
     });
 
     // Deduct stock

@@ -61,7 +61,8 @@ export async function getOrders() {
     items: JSON.parse(r.get('Items') || '[]'),
     totalAmount: Number(r.get('Total')),
     total: Number(r.get('Total')),
-    status: r.get('Status')
+    status: r.get('Status'),
+    paid: r.get('Paid') === 'TRUE' || r.get('Paid') === 'true' || r.get('Paid') === true
   })).reverse();
 }
 
@@ -333,7 +334,8 @@ export async function cleanupOldOrders(ip?: string, days: number = 30) {
             phone: r.get('Phone'),
             items: r.get('Items'),
             total: r.get('Total'),
-            status: r.get('Status')
+            status: r.get('Status'),
+            paid: r.get('Paid')
           });
           await r.delete();
           deletedCount++;

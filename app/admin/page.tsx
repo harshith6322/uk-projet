@@ -12,6 +12,7 @@ type Order = {
   totalAmount: number;
   createdAt: string;
   notes: string;
+  paid?: boolean;
   items: {
     quantity: number;
     price: number;
@@ -110,6 +111,7 @@ export default function AdminDashboard() {
   }, [orders, products, prepStartDate, prepEndDate]);
 
   const [filter, setFilter] = useState("all");
+  const [paidFilter, setPaidFilter] = useState<"all" | "paid" | "unpaid">("all");
   const [sortOrder, setSortOrder] = useState<"newest" | "oldest">("newest");
   const [expandedOrder, setExpandedOrder] = useState<number | null>(null);
   const [showAddProduct, setShowAddProduct] = useState(false);
@@ -170,6 +172,17 @@ export default function AdminDashboard() {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status }),
+    });
+    load();
+  };
+
+  const updatePaidStatus = async (id: number | string, paid: boolean) => {
+    // Optimistic UI update
+    setOrders(orders.map(o => o.id === id ? { ...o, paid } : o));
+    await fetch(`/api/admin/orders/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ paid }),
     });
     load();
   };
@@ -278,7 +291,7 @@ export default function AdminDashboard() {
       return;
     }
 
-    let csv = "Name," + activeProducts.map(p => p.name.replace(/,/g, '')).join(",") + ",Total Amount\n";
+    let csv = "Name," + activeProducts.map(p => p.name.replace(/,/g, '')).join(",") + ",Total Amount,Payment,Date\n";
 
     const productTotals: Record<number, number> = {};
     activeProducts.forEach(p => productTotals[p.id] = 0);
@@ -293,7 +306,9 @@ export default function AdminDashboard() {
         row += `${qty},`;
       });
       grandTotalAmount += o.totalAmount;
-      row += `£${o.totalAmount.toFixed(2)}\n`;
+      const paymentStatus = o.paid ? 'Paid' : 'Unpaid';
+      const orderDate = new Date(o.createdAt).toLocaleDateString("en-GB");
+      row += `£${o.totalAmount.toFixed(2)},${paymentStatus},${orderDate}\n`;
       csv += row;
     });
 
@@ -301,7 +316,7 @@ export default function AdminDashboard() {
     activeProducts.forEach(p => {
       totalRow += `${productTotals[p.id]},`;
     });
-    totalRow += `£${grandTotalAmount.toFixed(2)}\n\n\n`;
+    totalRow += `£${grandTotalAmount.toFixed(2)},,\n\n\n`;
     csv += totalRow;
 
     activeProducts.forEach(p => {
@@ -310,7 +325,7 @@ export default function AdminDashboard() {
       }
     });
 
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.setAttribute('hidden', '');
@@ -326,7 +341,9 @@ export default function AdminDashboard() {
     router.push("/admin/login");
   };
 
-  const filteredOrders = (filter === "all" ? orders : orders.filter((o) => o.status === filter))
+  const filteredOrders = orders
+    .filter((o) => filter === "all" ? true : o.status === filter)
+    .filter((o) => paidFilter === "all" ? true : paidFilter === "paid" ? o.paid : !o.paid)
     .sort((a, b) => {
       const dateA = new Date(a.createdAt).getTime();
       const dateB = new Date(b.createdAt).getTime();
@@ -844,6 +861,18 @@ export default function AdminDashboard() {
                   <div className="h-6 w-px bg-gray-800 mx-1"></div>
                   
                   <select
+                    value={paidFilter}
+                    onChange={(e) => setPaidFilter(e.target.value as "all" | "paid" | "unpaid")}
+                    className="bg-gray-800 text-gray-300 text-xs font-medium px-3 py-1.5 rounded-lg border border-gray-700 focus:outline-none focus:ring-1 focus:ring-grove-500"
+                  >
+                    <option value="all">All Payments</option>
+                    <option value="paid">Paid ✅</option>
+                    <option value="unpaid">Unpaid ❌</option>
+                  </select>
+
+                  <div className="h-6 w-px bg-gray-800 mx-1"></div>
+                  
+                  <select
                     value={sortOrder}
                     onChange={(e) => setSortOrder(e.target.value as "newest" | "oldest")}
                     className="bg-gray-800 text-gray-300 text-xs font-medium px-3 py-1.5 rounded-lg border border-gray-700 focus:outline-none focus:ring-1 focus:ring-grove-500"
@@ -920,6 +949,11 @@ export default function AdminDashboard() {
                           <span className={`badge-${o.status}`}>
                             {o.status}
                           </span>
+                          {o.paid ? (
+                            <span className="bg-green-900/50 text-green-400 border border-green-700/50 px-2 py-0.5 rounded-full text-xs font-medium ml-1">Paid ✅</span>
+                          ) : (
+                            <span className="bg-red-900/50 text-red-400 border border-red-700/50 px-2 py-0.5 rounded-full text-xs font-medium ml-1">Unpaid ❌</span>
+                          )}
                         </div>
                         <p className="text-gray-500 text-xs">
                           {o.phone} · {o.orderNumber} ·{" "}
@@ -989,6 +1023,12 @@ export default function AdminDashboard() {
                               ↩ Revert to Pending
                             </button>
                           )}
+                          <button
+                            onClick={() => updatePaidStatus(o.id, !o.paid)}
+                            className={`px-4 py-2 text-white text-sm rounded-lg transition border ${o.paid ? 'bg-gray-700 hover:bg-gray-600 border-gray-600' : 'bg-green-700 hover:bg-green-600 border-green-600'}`}
+                          >
+                            {o.paid ? 'Mark Unpaid' : 'Mark Paid 💳'}
+                          </button>
                           <div className="flex flex-col gap-1 w-full bg-gray-800/50 p-3 rounded-lg border border-gray-700 mt-2">
                             <p className="text-gray-300 text-sm font-medium border-b border-gray-700 pb-2 mb-1">Customer Details</p>
                             {o.email && <p className="text-gray-400 text-sm">📧 {o.email}</p>}

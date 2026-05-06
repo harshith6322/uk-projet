@@ -5,7 +5,7 @@ import { getDoc, getAllSettings } from '@/lib/google-sheets'
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   if (!verifyAdminRequest(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { status } = await req.json()
+  const body = await req.json()
   
   try {
     const doc = await getDoc();
@@ -14,21 +14,32 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     const row = rows.find(r => r.get('Order ID') === params.id);
     
     if (row) {
-      row.set('Status', status);
+      if (body.status !== undefined) {
+        row.set('Status', body.status);
+      }
+      if (body.paid !== undefined) {
+        try {
+          row.set('Paid', body.paid ? 'TRUE' : 'FALSE');
+        } catch (e) {
+          console.error("Paid column might not exist", e);
+        }
+      }
       await row.save();
       
-      const email = row.get('Email');
-      if (email) {
-        const settings = await getAllSettings();
-        if (settings['EnableEmails'] !== 'FALSE') {
-          import('@/lib/email').then(m => m.sendOrderStatusUpdateEmail(
-            email,
-            row.get('Name') || 'Customer',
-            params.id,
-            status,
-            req.nextUrl.origin,
-            settings['EnableFeedback'] !== 'FALSE'
-          )).catch(console.error);
+      if (body.status !== undefined) {
+        const email = row.get('Email');
+        if (email) {
+          const settings = await getAllSettings();
+          if (settings['EnableEmails'] !== 'FALSE') {
+            import('@/lib/email').then(m => m.sendOrderStatusUpdateEmail(
+              email,
+              row.get('Name') || 'Customer',
+              params.id,
+              body.status,
+              req.nextUrl.origin,
+              settings['EnableFeedback'] !== 'FALSE'
+            )).catch(console.error);
+          }
         }
       }
 
