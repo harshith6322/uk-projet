@@ -274,9 +274,9 @@ export default function OrderPage() {
               <h2 className="text-3xl md:text-4xl font-serif text-grove-800 dark:text-grove-300 mb-3 drop-shadow-sm">
                 {process.env.NEXT_PUBLIC_HERO_TITLE || "This Week's Fresh Picks"}
               </h2>
-              <p className="text-bark-500 dark:text-bark-300">
+              {/* <p className="text-bark-500 dark:text-bark-300">
                 {process.env.NEXT_PUBLIC_HERO_SUBTITLE || "Place your order before 10 PM · Collection details shared in the group"}
-              </p>
+              </p> */}
             </div>
 
             <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 ${itemCount > 0 ? 'pb-32' : ''}`}>
