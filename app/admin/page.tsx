@@ -291,14 +291,14 @@ export default function AdminDashboard() {
       return;
     }
 
-    let csv = "Name," + activeProducts.map(p => p.name.replace(/,/g, '')).join(",") + ",Total Amount,Payment,Date\n";
+    let csv = "Order ID,Name," + activeProducts.map(p => p.name.replace(/,/g, '')).join(",") + ",Total Amount,Payment,Date\n";
 
     const productTotals: Record<number, number> = {};
     activeProducts.forEach(p => productTotals[p.id] = 0);
     let grandTotalAmount = 0;
 
     activeOrders.forEach(o => {
-      let row = `"${o.name.replace(/"/g, '""')}",`;
+      let row = `"${o.orderNumber || o.id}","${o.name.replace(/"/g, '""')}",`;
       activeProducts.forEach(p => {
         const item = o.items.find(i => i.product.name === p.name);
         const qty = item ? item.quantity : 0;
@@ -312,7 +312,7 @@ export default function AdminDashboard() {
       csv += row;
     });
 
-    let totalRow = "TOTAL,";
+    let totalRow = ",TOTAL,";
     activeProducts.forEach(p => {
       totalRow += `${productTotals[p.id]},`;
     });
